@@ -46,7 +46,16 @@ WHERE id_cliente IN -- fa una subconsulta
 	INNER JOIN productos PR ON DP.id_producto = PR.id_producto -- junta la taula resultant amb la taula productos per id_producto
     GROUP BY P.id_cliente -- agrupa per id_cliente
     HAVING COUNT(DISTINCT PR.categoría) >1); -- selecciona les categories que apareixen més d'una vegada
--- M'agradaria imprimir quines categories o quantes categories diferents han comprat els clients
+    
+-- Presenta quins clients amb id i nom han comprat més d'una categoria i quina categoria és 
+SELECT C.id_cliente, C.nombre, categoría FROM Clientes C
+INNER JOIN (
+	SELECT P.id_cliente, PR.categoría FROM Pedidos P
+    INNER JOIN Detalles_Pedidos DP ON P.id_pedido = DP.id_pedido
+    INNER JOIN Productos PR ON DP.id_producto = PR.id_producto
+    GROUP BY P.id_cliente, PR.categoría
+    -- HAVING COUNT(DISTINCT PR.categoría) >1 (no aconsegueixo que agafi només els clients que tenen més d'una categoria)
+) AS clientes_multiples_categorias ON C.id_cliente = clientes_multiples_categorias.id_cliente;
 
 -- 7. Ventas Totales por Mes:
 -- Muestra las ventas totales agrupadas por mes y año.
@@ -59,9 +68,32 @@ ORDER BY P.fecha_pedido DESC; -- ordena per data de més recent a menys
 
 -- 8. Promedio de Productos por Pedido:
 -- Calcula la cantidad promedio de productos por pedido.
+SELECT DP.id_producto, Pr.nombre, AVG(DP.cantidad) AS cantidad_promedio FROM Detalles_Pedidos DP 
+-- Crea una llista de productes amb la quantitat promig de cada producte per comanda
+INNER JOIN Productos Pr ON DP.id_producto = Pr.id_producto -- juna les taules detalles_pedidos amb productos per id_producto
+GROUP BY DP.id_producto, Pr.nombre -- agrupa per id_produto i nom del producte (de la taula producte)
+ORDER BY cantidad_promedio DESC; -- ordena les files per la que té el promig més alt de quantiat promig
 
 -- 9. Tasa de Retención de Clientes:
 -- Determina cuántos clientes han realizado pedidos en más de una ocasión. 
+SELECT COUNT(*) AS num_clientes -- presenta el num de clients que compleixen la condició
+FROM (
+	SELECT P.id_cliente FROM Pedidos P -- Selecciona el client de la taula Pedidos per id-cliente
+    GROUP BY P.id_cliente -- agrupa els clients per id_cliente
+    HAVING COUNT(DISTINCT P.id_pedido) > 1 -- compta els clients que tenen més d'una comanda
+) AS clientes_multiples_pedidos; -- genera la variable
+
+-- Proporciona el nombre y el id de los clientes que han realizado pedidos en más de una ocasión y cuantos pedidos han realizado. 
+SELECT C.id_cliente, C.nombre, COUNT(*) AS num_pedidos FROM Clientes C -- Presenta una taula amb id_cliente i nom client i el comptatge de comandes de cada un
+INNER JOIN Pedidos P ON C.id_cliente = P.id_cliente -- junta les taules Clientes i Pedidos per id_cliente
+GROUP BY C.id_cliente, C.nombre -- agrupa per id_cliente i nom client
+HAVING COUNT(DISTINCT P.id_pedido) > 1; -- Compta les comandes fetes que siguin més d'una
 
 -- 10. Tiempo Promedio entre Pedidos:
 -- Calcula el tiempo promedio que pasa entre pedidos para cada cliente.
+SELECT P.id_cliente, AVG(DATEDIFF(P.fecha_pedido, lag_fecha_pedido)) AS tiempo_promedio_entre_pedido 
+FROM (
+	SELECT id_cliente, fecha_pedido, LAG(fecha_pedido) OVER (PARTITION BY id_cliente ORDER BY fecha_pedido) AS lag_fecha_pedido
+    FROM Pedidos
+) AS P
+GROUP BY P.id_cliente;
